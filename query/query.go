@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"strings"
-	"sync"
 )
 
 const (
@@ -72,78 +71,53 @@ type Tag struct {
 	Title string `json:"title"`
 }
 
+// Query struct
+type Query struct {
+	MaxLoad    int
+	PerPage    int
+	TotalItems int
+}
+
 // Make query
-func Make(cat string, TotalItems int) Query {
-	if TotalItems < MaxPerPage {
-		return Query{cat, TotalItems, TotalItems}
+func Make(MaxLoad int, TotalItems int) *Query {
+	pp := MaxPerPage
+
+	if TotalItems < pp {
+		pp = TotalItems
 	}
 
-	return Query{cat, MaxPerPage, TotalItems}
-}
-
-// Set queries
-func Set(ml int, q ...Query) *Queries {
-	return &Queries{Q: q, MaxLoad: ml}
-}
-
-// Queries struct
-type Queries struct {
-	Q       []Query
-	Books   []Book
-	MaxLoad int
+	return &Query{
+		MaxLoad:    MaxLoad,
+		PerPage:    pp,
+		TotalItems: TotalItems,
+	}
 }
 
 // FetchToStream fetch all query to stream channel
-func (qr *Queries) FetchToStream() chan Book {
-
+func (q *Query) FetchToStream() chan Book {
 	stream := make(chan Book)
-
 	go func() {
-		// range over syncrhonously queries (category)
-		for _, q := range qr.Q {
-
-			MaxPagePerFetch := qr.MaxLoad / q.PerPage
-			MaxPage := q.TotalItems / q.PerPage
-
-			// partially fetch page per range syncrhonously
-			for i := 1; i <= MaxPage; i += MaxPagePerFetch {
-				from, to := getRange(i, MaxPage, MaxPagePerFetch)
-				q.FetchRange(from, to, stream)
-			}
+		// RangePerFetch := q.MaxLoad / q.PerPage
+		TilPage := q.TotalItems / q.PerPage
+		// for i := 1; i <= TilPage; i += RangePerFetch {
+		// from, to := getRange(i, TilPage, RangePerFetch)
+		// log.Printf("Fetching products from page %d - %d", from, to)
+		for i := 1; i <= TilPage; i++ {
+			go q.FetchPage(i, stream)
 		}
+		// }
 	}()
 
 	return stream
 }
 
-// Query struct
-type Query struct {
-	Category   string
-	PerPage    int
-	TotalItems int
-}
-
-// FetchRange per page range
-func (q *Query) FetchRange(from, to int, stream chan Book) {
-
-	log.Printf("Fetching \"%s\" books from page %d to %d...\n", q.Category, from, to)
-
-	// wait until all page fetched then jump to the next range
-	var wg sync.WaitGroup
-	for i := from; i <= to; i++ {
-		wg.Add(1)
-		go q.FetchPage(i, stream, &wg)
-	}
-	wg.Wait()
-}
-
 // FetchPage fetch page data
-func (q *Query) FetchPage(page int, stream chan Book, wg *sync.WaitGroup) {
-	defer wg.Done()
+func (q *Query) FetchPage(page int, stream chan Book) {
+
+	log.Printf("Fetching %d products at page %d", q.PerPage, page)
 
 	res, err := http.Get(fmt.Sprintf(
-		"https://www.gramedia.com/api/products/?category=%s&format=json&page=%d&per_page=%d",
-		q.Category,
+		"https://www.gramedia.com/api/products?format=json&page=%d&per_page=%d",
 		page,
 		q.PerPage,
 	))
