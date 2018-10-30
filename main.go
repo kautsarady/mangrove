@@ -9,20 +9,20 @@ import (
 
 func main() {
 	category := flag.String("c", "buku", "product category to fetch")
-	ppage := flag.Int("pp", 20, "MAX=100, important to determine fetch range")
-	total := flag.Int("ti", 40, "desired total product to fecth")
+	total := flag.Int("ti", 20, "desired total product to fetch")
 	mload := flag.Int("ml", 500, "default=500, depend on host machine, higher is better")
+	output := flag.String("o", "data.json", "default=data.json, output file name, must be a JSON file")
 	flag.Parse()
 
-	q := query.Make(*category, *ppage, *total)
+	q := query.Make(*category, *total)
 
 	qr := query.Set(*mload, q)
 
 	stream := qr.FetchToStream()
 
-	// Write json asynchronously
-	for i := 1; ; i++ {
-		query.AppendJSON("data.json", <-stream)
-		log.Printf("Current data count %d", i)
+	// Write json synchronously
+	for i := 1; i <= int(*total); i++ {
+		query.AppendJSON(*output, <-stream)
+		log.Printf("Finished writing %d data", i)
 	}
 }

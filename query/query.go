@@ -10,6 +10,11 @@ import (
 	"sync"
 )
 
+const (
+	// MaxPerPage Currently gramedia limit max item load per page to 100
+	MaxPerPage = 100
+)
+
 // Book rep struct & JSON
 type Book struct {
 	Title       string     `json:"name"`
@@ -68,8 +73,12 @@ type Tag struct {
 }
 
 // Make query
-func Make(cat string, PerPage, TotalItems int) Query {
-	return Query{cat, PerPage, TotalItems}
+func Make(cat string, TotalItems int) Query {
+	if TotalItems < MaxPerPage {
+		return Query{cat, TotalItems, TotalItems}
+	}
+
+	return Query{cat, MaxPerPage, TotalItems}
 }
 
 // Set queries
