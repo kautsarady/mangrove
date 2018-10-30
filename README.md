@@ -1,6 +1,9 @@
 # mangrove
 gramedia product fetcher
 
+# branch
+- [full-concurrent](https://github.com/kautsarady/mangrove/tree/full-concurrent)
+
 # quick start
 ```sh
 $ go build -o mangrove .
@@ -24,6 +27,7 @@ Available option (29 Oct 2018).
 |     "bayi-balita"    |      5634	    |
 |     "agama"    |       4909	    |
 <br>
+
 this could trigger memory leak panic, tune `-ml` flag to lower than `500` for better result (but slower)
 
 > panic: runtime error: invalid memory address or nil pointer dereference [signal SIGSEGV: segmentation violation.
