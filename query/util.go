@@ -11,7 +11,7 @@ import (
 func AppendJSON(filepath string, book Book) {
 	var books []Book
 
-	jsonFile, err := os.Open("data.json")
+	jsonFile, err := os.Open(filepath)
 	if err != nil {
 		fmt.Errorf("%v", err)
 	}

@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"sync"
 )
 
 const (
@@ -26,7 +27,9 @@ type Book struct {
 }
 
 // fetch and embed book description then send it through channel
-func (book Book) setDescAndSend(stream chan Book) {
+func (book Book) setDescAndSend(stream chan Book, bookWG *sync.WaitGroup) {
+
+	defer bookWG.Done()
 
 	res, err := http.Get(book.GramedLink)
 	if err != nil {
@@ -95,24 +98,37 @@ func Make(MaxLoad int, TotalItems int) *Query {
 
 // FetchToStream fetch all query to stream channel
 func (q *Query) FetchToStream() chan Book {
+
 	stream := make(chan Book)
+
 	go func() {
-		// RangePerFetch := q.MaxLoad / q.PerPage
+
+		RangePerFetch := q.MaxLoad / q.PerPage
 		TilPage := q.TotalItems / q.PerPage
-		// for i := 1; i <= TilPage; i += RangePerFetch {
-		// from, to := getRange(i, TilPage, RangePerFetch)
-		// log.Printf("Fetching products from page %d - %d", from, to)
-		for i := 1; i <= TilPage; i++ {
-			go q.FetchPage(i, stream)
+
+		for i := 1; i <= TilPage; i += RangePerFetch {
+
+			from, to := getRange(i, TilPage, RangePerFetch)
+			log.Printf("Fetching products from page %d - %d", from, to)
+
+			var pageWG sync.WaitGroup
+			for i := from; i <= to; i++ {
+
+				pageWG.Add(1)
+				go q.FetchPage(i, stream, &pageWG)
+
+			}
+			pageWG.Wait()
 		}
-		// }
 	}()
 
 	return stream
 }
 
 // FetchPage fetch page data
-func (q *Query) FetchPage(page int, stream chan Book) {
+func (q *Query) FetchPage(page int, stream chan Book, pageWG *sync.WaitGroup) {
+
+	defer pageWG.Done()
 
 	log.Printf("Fetching %d products at page %d", q.PerPage, page)
 
@@ -142,8 +158,11 @@ func (q *Query) FetchPage(page int, stream chan Book) {
 		fmt.Errorf("%v", err)
 	}
 
+	var bookWG sync.WaitGroup
 	for _, book := range books {
-		go book.setDescAndSend(stream)
+		bookWG.Add(1)
+		go book.setDescAndSend(stream, &bookWG)
 	}
+	bookWG.Wait()
 
 }
