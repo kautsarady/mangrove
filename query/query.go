@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"strings"
-	"sync"
 )
 
 const (
@@ -27,9 +26,7 @@ type Book struct {
 }
 
 // fetch and embed book description then send it through channel
-func (book Book) setDescAndSend(stream chan Book, bookWG *sync.WaitGroup) {
-
-	defer bookWG.Done()
+func (book Book) setDescAndSend(stream chan Book) {
 
 	res, err := http.Get(book.GramedLink)
 	if err != nil {
@@ -76,13 +73,12 @@ type Tag struct {
 
 // Query struct
 type Query struct {
-	MaxLoad    int
 	PerPage    int
 	TotalItems int
 }
 
 // Make query
-func Make(MaxLoad int, TotalItems int) *Query {
+func Make(TotalItems int) *Query {
 	pp := MaxPerPage
 
 	if TotalItems < pp {
@@ -90,7 +86,6 @@ func Make(MaxLoad int, TotalItems int) *Query {
 	}
 
 	return &Query{
-		MaxLoad:    MaxLoad,
 		PerPage:    pp,
 		TotalItems: TotalItems,
 	}
@@ -98,27 +93,11 @@ func Make(MaxLoad int, TotalItems int) *Query {
 
 // FetchToStream fetch all query to stream channel
 func (q *Query) FetchToStream() chan Book {
-
 	stream := make(chan Book)
-
 	go func() {
-
-		RangePerFetch := q.MaxLoad / q.PerPage
 		TilPage := q.TotalItems / q.PerPage
-
-		for i := 1; i <= TilPage; i += RangePerFetch {
-
-			from, to := getRange(i, TilPage, RangePerFetch)
-			log.Printf("Fetching products from page %d - %d", from, to)
-
-			var pageWG sync.WaitGroup
-			for i := from; i <= to; i++ {
-
-				pageWG.Add(1)
-				go q.FetchPage(i, stream, &pageWG)
-
-			}
-			pageWG.Wait()
+		for i := 1; i <= TilPage; i++ {
+			go q.FetchPage(i, stream)
 		}
 	}()
 
@@ -126,9 +105,7 @@ func (q *Query) FetchToStream() chan Book {
 }
 
 // FetchPage fetch page data
-func (q *Query) FetchPage(page int, stream chan Book, pageWG *sync.WaitGroup) {
-
-	defer pageWG.Done()
+func (q *Query) FetchPage(page int, stream chan Book) {
 
 	log.Printf("Fetching %d products at page %d", q.PerPage, page)
 
@@ -158,11 +135,7 @@ func (q *Query) FetchPage(page int, stream chan Book, pageWG *sync.WaitGroup) {
 		fmt.Errorf("%v", err)
 	}
 
-	var bookWG sync.WaitGroup
 	for _, book := range books {
-		bookWG.Add(1)
-		go book.setDescAndSend(stream, &bookWG)
+		go book.setDescAndSend(stream)
 	}
-	bookWG.Wait()
-
 }
