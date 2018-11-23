@@ -12,6 +12,8 @@ func main() {
 	output := flag.String("o", "data.json", "default=data.json, output file name, must be a JSON file")
 	flag.Parse()
 
+	log.Printf("Fetching %d data to %s ...", *total, *output)
+	
 	stream := query.Make(*total).FetchToStream()
 
 	for i := 1; i <= int(*total); i++ {
